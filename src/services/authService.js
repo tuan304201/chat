@@ -53,9 +53,14 @@ export const login = async ({ username, password }) => {
 
 export const refreshTokens = async ({ refreshToken }) => {
   if (!refreshToken) throw new Error("Missing refresh token");
-  const payload = verifyRefreshToken(refreshToken); // throws if invalid
-  // Optionally check token present in redis (revocation)
-  // For now, issue new tokens
+
+  const payload = verifyRefreshToken(refreshToken);
+
+  const isRevoked = await redis.get(`revoked_refresh:${refreshToken}`);
+  if (isRevoked) {
+    throw new Error("Refresh token has been revoked");
+  }
+
   const newAccess = signAccessToken({ sub: payload.sub, username: payload.username });
   const newRefresh = signRefreshToken({ sub: payload.sub, username: payload.username });
 

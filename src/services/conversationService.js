@@ -10,7 +10,7 @@ export const createPrivateConversation = async ({ userAId, userBId }) => {
   // try find existing private conversation with exactly these two members
   const conv = await Conversation.findOne({
     type: "private",
-    "members.userId": { $all: [mongoose.Types.ObjectId(userAId), mongoose.Types.ObjectId(userBId)] },
+    "members.userId": { $all: [new mongoose.Types.ObjectId(userAId), new mongoose.Types.ObjectId(userBId)] },
     $expr: { $eq: [{ $size: "$members" }, 2] },
   });
 

@@ -78,7 +78,7 @@ export const cancelRequest = async ({ requestId, senderId }) => {
   const req = await FriendRequest.findById(requestId);
   if (!req) throw new Error("Friend request not found");
   if (req.from.toString() !== senderId.toString()) throw new Error("Not authorized");
-  await req.remove();
+  await req.deleteOne();
   return true;
 };
 

@@ -32,6 +32,7 @@ export default function chatHandler(io, socket) {
         text: payload.text,
         fileUrl: payload.fileUrl,
         metadata: payload.metadata,
+        replyToId: payload.replyToId,
       });
 
       // emit to room (all sockets joined to conv)
@@ -39,6 +40,24 @@ export default function chatHandler(io, socket) {
 
       // ack to sender
       if (cb) cb({ success: true, message: msg });
+    } catch (err) {
+      if (cb) cb({ success: false, message: err.message });
+    }
+  });
+
+  socket.on("message:recall", async ({ messageId }, cb) => {
+    try {
+      // Gọi service recall
+      const recalledMsg = await messageService.recallMessage({ messageId, actorId: userId });
+
+      // Báo cho tất cả mọi người trong phòng chat biết tin nhắn này đã bị thu hồi
+      // Client sẽ nhận được messageId và cập nhật UI thành "Tin nhắn đã thu hồi"
+      io.to(`conv:${recalledMsg.conversationId}`).emit("message:recalled", {
+        messageId,
+        conversationId: recalledMsg.conversationId,
+      });
+
+      if (cb) cb({ success: true });
     } catch (err) {
       if (cb) cb({ success: false, message: err.message });
     }

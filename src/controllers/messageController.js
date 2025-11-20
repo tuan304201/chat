@@ -53,3 +53,16 @@ export const remove = async (req, res, next) => {
     next(err);
   }
 };
+
+export const react = async (req, res, next) => {
+  try {
+    const msg = await messageService.reactToMessage({
+      messageId: req.body.messageId,
+      userId: req.user.id,
+      emoji: req.body.emoji,
+    });
+    res.json({ success: true, reactions: msg.reactions });
+  } catch (err) {
+    next(err);
+  }
+};

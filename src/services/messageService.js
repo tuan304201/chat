@@ -19,6 +19,7 @@ export const sendMessage = async (payload) => {
     text: text || null,
     fileUrl: fileUrl || null,
     metadata: metadata || {},
+    replyTo: replyToId || null,
   });
 
   await msg.save();
@@ -32,11 +33,16 @@ export const sendMessage = async (payload) => {
   (await msg.populate("sender", "_id username displayName avatarUrl").execPopulate?.()) ||
     (await msg.populate("sender", "_id username displayName avatarUrl"));
 
+  await msg.populate("sender", "_id username displayName avatarUrl");
+  if (replyToId) {
+    await msg.populate("replyTo");
+  }
+
   return msg;
 };
 
 export const getMessages = async ({ conversationId, limit = 20, cursor = null }) => {
-  const query = { conversationId: mongoose.Types.ObjectId(conversationId) };
+  const query = { conversationId: new mongoose.Types.ObjectId(conversationId) };
   if (cursor) {
     // find message by id to obtain createdAt
     const cursorMsg = await Message.findById(cursor).select("createdAt");
@@ -53,9 +59,9 @@ export const getMessages = async ({ conversationId, limit = 20, cursor = null })
 
 export const markAsSeen = async ({ conversationId, userId, lastSeenMessageId }) => {
   const filter = {
-    conversationId: mongoose.Types.ObjectId(conversationId),
-    _id: { $lte: mongoose.Types.ObjectId(lastSeenMessageId) },
-    seenBy: { $ne: mongoose.Types.ObjectId(userId) },
+    conversationId: new mongoose.Types.ObjectId(conversationId),
+    _id: { $lte: new mongoose.Types.ObjectId(lastSeenMessageId) },
+    seenBy: { $ne: new mongoose.Types.ObjectId(userId) },
   };
 
   const res = await Message.updateMany(filter, { $addToSet: { seenBy: userId } });
@@ -86,6 +92,31 @@ export const deleteMessage = async ({ messageId, actorId }) => {
   msg.metadata = msg.metadata || {};
   msg.metadata.deleted = true;
   msg.deleted = true;
+  await msg.save();
+  return msg;
+};
+
+export const recallMessage = async ({ messageId, actorId }) => {
+  const msg = await Message.findById(messageId);
+  if (!msg) throw new Error("Message not found");
+
+  // Chỉ người gửi mới được thu hồi
+  if (msg.sender.toString() !== actorId.toString()) {
+    throw new Error("Not authorized to recall this message");
+  }
+
+  // (Tuỳ chọn) Kiểm tra thời gian: Chỉ cho thu hồi trong vòng 1 giờ
+  const ONE_HOUR = 60 * 60 * 1000;
+  if (Date.now() - new Date(msg.createdAt).getTime() > ONE_HOUR) {
+    throw new Error("Message is too old to recall");
+  }
+
+  // Đánh dấu thu hồi và xóa nội dung
+  msg.isRecalled = true;
+  msg.text = null; // Xóa nội dung text
+  msg.fileUrl = null; // Xóa file nếu có
+  msg.metadata = {}; // Xóa metadata
+
   await msg.save();
   return msg;
 };

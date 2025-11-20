@@ -9,5 +9,6 @@ router.post("/send", messageController.send);
 router.get("/:conversationId", messageController.list);
 router.put("/edit", messageController.edit);
 router.delete("/remove", messageController.remove);
+router.post("/react", messageController.react);
 
 export default router;

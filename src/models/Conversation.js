@@ -49,6 +49,11 @@ const conversationSchema = new mongoose.Schema(
       ref: "Message",
       default: null,
     },
+    settings: {
+      joinApprovalRequired: { type: Boolean, default: false },
+      onlyAdminCanChat: { type: Boolean, default: false },
+    },
+    pinnedMessages: [{ type: mongoose.Schema.Types.ObjectId, ref: "Message" }],
   },
   { timestamps: true },
 );

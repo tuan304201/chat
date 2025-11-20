@@ -43,6 +43,22 @@ const messageSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+
+    replyTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Message",
+      default: null,
+    },
+    isRecalled: {
+      type: Boolean,
+      default: false,
+    },
+    reactions: [
+      {
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        emoji: String, // 'LIKE', 'HEART', 'HAHA'...
+      },
+    ],
   },
   { timestamps: true },
 );
