@@ -2,6 +2,15 @@ import * as friendService from "../services/friendService.js";
 
 export const sendRequest = async (req, res, next) => {
   try {
+    // --- THÊM LOG ĐỂ DEBUG ---
+    console.log("Body received:", req.body);
+    console.log("Sender:", req.user.id);
+
+    if (!req.body.toId) {
+      return res.status(400).json({ success: false, message: "Thiếu toId" });
+    }
+    // -------------------------
+
     const result = await friendService.sendRequest({
       fromId: req.user.id,
       toId: req.body.toId,

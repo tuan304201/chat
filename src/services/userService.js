@@ -8,11 +8,17 @@ export const getById = async (id) => {
   return user;
 };
 
-export const searchByUsername = async (q, { limit = 20 } = {}) => {
+export const searchByUsername = async (q, currentUserId, { limit = 20 } = {}) => {
   if (!q) return [];
-  // Simple text search by regex — sufficient for small scale; replace with text index or Elastic for bigger scale
   const regex = new RegExp(q.trim(), "i");
-  const users = await User.find({ username: regex }).limit(limit).select("_id username displayName avatarUrl");
+
+  const users = await User.find({
+    username: regex,
+    _id: { $ne: currentUserId },
+  })
+    .limit(limit)
+    .select("_id username displayName avatarUrl");
+
   return users;
 };
 

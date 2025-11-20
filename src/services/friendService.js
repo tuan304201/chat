@@ -40,27 +40,21 @@ export const acceptRequest = async ({ requestId, acceptorId }) => {
 
   if (req.status === "accepted") return req;
 
-  // create friendships both sides
-  const session = await FriendRequest.startSession();
-  session.startTransaction();
+  // Cập nhật trạng thái request
+  req.status = "accepted";
+  await req.save();
+
+  // Tạo quan hệ bạn bè 2 chiều (Không dùng transaction nữa)
   try {
-    req.status = "accepted";
-    await req.save({ session });
-
-    await Friendship.create(
-      [
-        { userId: req.from, friendId: req.to },
-        { userId: req.to, friendId: req.from },
-      ],
-      { session },
-    );
-
-    await session.commitTransaction();
-    session.endSession();
+    await Friendship.create([
+      { userId: req.from, friendId: req.to },
+      { userId: req.to, friendId: req.from },
+    ]);
     return req;
   } catch (err) {
-    await session.abortTransaction();
-    session.endSession();
+    // Nếu lỗi khi tạo bạn bè, ta nên revert lại status (thủ công)
+    req.status = "pending";
+    await req.save();
     throw err;
   }
 };

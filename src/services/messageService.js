@@ -1,9 +1,10 @@
 import Message from "../models/Message.js";
 import Conversation from "../models/Conversation.js";
+import Friendship from "../models/Friendship.js";
 import mongoose from "mongoose";
 
 export const sendMessage = async (payload) => {
-  const { conversationId, senderId, type, text, fileUrl, metadata } = payload;
+  const { conversationId, senderId, type, text, fileUrl, metadata, replyToId } = payload;
 
   const conv = await Conversation.findById(conversationId);
   if (!conv) throw new Error("Conversation not found");
@@ -11,6 +12,28 @@ export const sendMessage = async (payload) => {
   // check membership for private/group
   const member = conv.members.find((m) => m.userId.toString() === senderId.toString());
   if (!member) throw new Error("Not a member of conversation");
+
+  if (conv.type === "private") {
+    // Tìm người nhận (người kia trong hội thoại)
+    const receiver = conv.members.find((m) => m.userId.toString() !== senderId.toString());
+
+    if (receiver) {
+      const isFriend = await checkFriendship(senderId, receiver.userId);
+
+      if (!isFriend) {
+        // Nếu chưa kết bạn: Đếm số tin nhắn sender đã gửi trong cuộc hội thoại này
+        const sentCount = await Message.countDocuments({
+          conversationId,
+          sender: senderId,
+        });
+
+        // Nếu đã gửi 1 tin rồi thì chặn
+        if (sentCount >= 1) {
+          throw new Error("Bạn cần kết bạn để gửi thêm tin nhắn");
+        }
+      }
+    }
+  }
 
   const msg = new Message({
     conversationId,
@@ -33,10 +56,7 @@ export const sendMessage = async (payload) => {
   (await msg.populate("sender", "_id username displayName avatarUrl").execPopulate?.()) ||
     (await msg.populate("sender", "_id username displayName avatarUrl"));
 
-  await msg.populate("sender", "_id username displayName avatarUrl");
-  if (replyToId) {
-    await msg.populate("replyTo");
-  }
+  if (replyToId) await msg.populate("replyTo");
 
   return msg;
 };
@@ -58,6 +78,19 @@ export const getMessages = async ({ conversationId, limit = 20, cursor = null })
 };
 
 export const markAsSeen = async ({ conversationId, userId, lastSeenMessageId }) => {
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) return;
+
+  if (conv.type === "private") {
+    const otherMember = conv.members.find((m) => m.userId.toString() !== userId.toString());
+    if (otherMember) {
+      const isFriend = await checkFriendship(userId, otherMember.userId);
+      if (!isFriend) {
+        return { skipped: true, reason: "Not friends" };
+      }
+    }
+  }
+
   const filter = {
     conversationId: new mongoose.Types.ObjectId(conversationId),
     _id: { $lte: new mongoose.Types.ObjectId(lastSeenMessageId) },
@@ -119,4 +152,40 @@ export const recallMessage = async ({ messageId, actorId }) => {
 
   await msg.save();
   return msg;
+};
+
+export const reactToMessage = async ({ messageId, userId, emoji }) => {
+  const msg = await Message.findById(messageId);
+  if (!msg) throw new Error("Message not found");
+
+  // Tìm xem user này đã thả reaction vào tin nhắn chưa
+  const existingIndex = msg.reactions.findIndex((r) => r.userId.toString() === userId.toString());
+
+  if (existingIndex > -1) {
+    // Đã từng thả
+    const currentEmoji = msg.reactions[existingIndex].emoji;
+    if (currentEmoji === emoji) {
+      // Giống cũ -> Xóa (Unlike)
+      msg.reactions.splice(existingIndex, 1);
+    } else {
+      // Khác cũ -> Đổi icon
+      msg.reactions[existingIndex].emoji = emoji;
+    }
+  } else {
+    // Chưa thả -> Thêm mới
+    msg.reactions.push({ userId, emoji });
+  }
+
+  await msg.save();
+  return msg;
+};
+
+const checkFriendship = async (userId1, userId2) => {
+  const friend = await Friendship.findOne({
+    $or: [
+      { userId: userId1, friendId: userId2 },
+      { userId: userId2, friendId: userId1 },
+    ],
+  });
+  return !!friend;
 };

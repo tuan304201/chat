@@ -74,11 +74,15 @@ export const removeMember = async ({ conversationId, actorId, targetMemberId }) 
 };
 
 export const getConversationsForUser = async (userId, { limit = 30, skip = 0 } = {}) => {
-  const convs = await Conversation.find({ "members.userId": userId })
+  const convs = await Conversation.find({
+    "members.userId": userId,
+    $or: [{ type: "group" }, { lastMessage: { $ne: null } }],
+  })
     .sort({ updatedAt: -1 })
     .skip(skip)
     .limit(limit)
-    .populate({ path: "lastMessage", select: "text fileUrl type createdAt sender" });
+    .populate({ path: "lastMessage", select: "text fileUrl type createdAt sender isRecalled" })
+    .populate("members.userId", "_id username displayName avatarUrl");
 
   return convs;
 };
@@ -89,7 +93,7 @@ export const getConversationById = async (conversationId, userId) => {
     "_id username displayName avatarUrl",
   );
   if (!conv) throw new Error("Conversation not found");
-  // membership check
+
   const member = conv.members.find((m) => m.userId._id.toString() === userId.toString());
   if (!member) throw new Error("Not authorized to view conversation");
   return conv;

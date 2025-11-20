@@ -1,8 +1,10 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import { env } from "../config/env.js"; // [Cite: Import env từ config]
 
 export default async function authMiddleware(req, res, next) {
   try {
+    // Lấy token từ cookie hoặc header
     const token = req.cookies?.accessToken || req.headers.authorization?.replace("Bearer ", "");
 
     if (!token) {
@@ -14,7 +16,7 @@ export default async function authMiddleware(req, res, next) {
 
     let payload;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET);
+      payload = jwt.verify(token, env.jwtSecret);
     } catch (err) {
       return res.status(401).json({
         success: false,
@@ -22,7 +24,7 @@ export default async function authMiddleware(req, res, next) {
       });
     }
 
-    const user = await User.findById(payload.userId).select("-password");
+    const user = await User.findById(payload.sub || payload.userId).select("-password");
     if (!user) {
       return res.status(401).json({
         success: false,

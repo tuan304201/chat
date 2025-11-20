@@ -12,7 +12,7 @@ export const getProfile = async (req, res, next) => {
 export const search = async (req, res, next) => {
   try {
     const q = req.query.q || "";
-    const users = await userService.searchByUsername(q);
+    const users = await userService.searchByUsername(q, req.user.id);
     res.json({ success: true, users });
   } catch (err) {
     next(err);
