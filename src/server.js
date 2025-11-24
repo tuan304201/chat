@@ -11,7 +11,8 @@ const startServer = async () => {
   const server = http.createServer(app);
 
   // SocketIO
-  initSocketServer(server);
+  const io = initSocketServer(server);
+  app.set("io", io);
 
   server.listen(env.port, () => {
     console.log(`Server running on http://localhost:${env.port}`);

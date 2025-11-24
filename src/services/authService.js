@@ -5,13 +5,14 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 import { redis } from "../config/redis.js";
 import { env } from "../config/env.js";
 
-export const register = async ({ username, password, displayName }) => {
+export const register = async ({ username, password, displayName, avatarUrl }) => {
+  // Validate cơ bản
   if (!username || !password || !displayName) {
-    throw new Error("Missing required fields");
+    throw new Error("Vui lòng điền đầy đủ thông tin");
   }
 
   const existing = await User.findOne({ username: username.toLowerCase().trim() });
-  if (existing) throw new Error("Username already exists");
+  if (existing) throw new Error("Tên đăng nhập đã tồn tại");
 
   const salt = await bcrypt.genSalt(10);
   const hashed = await bcrypt.hash(password, salt);
@@ -20,11 +21,17 @@ export const register = async ({ username, password, displayName }) => {
     username: username.toLowerCase().trim(),
     password: hashed,
     displayName,
+    avatarUrl: avatarUrl || null,
   });
 
   await user.save();
 
-  return { id: user._id, username: user.username, displayName: user.displayName };
+  return {
+    id: user._id,
+    username: user.username,
+    displayName: user.displayName,
+    avatarUrl: user.avatarUrl,
+  };
 };
 
 export const login = async ({ username, password }) => {

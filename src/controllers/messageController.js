@@ -20,6 +20,7 @@ export const list = async (req, res, next) => {
   try {
     const msgs = await messageService.getMessages({
       conversationId: req.params.conversationId,
+      currentUserId: req.user.id,
       limit: Number(req.query.limit) || 20,
       cursor: req.query.cursor || null,
     });

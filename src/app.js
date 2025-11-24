@@ -17,7 +17,11 @@ export const createApp = () => {
   const app = express();
 
   // --- Security Middlewares ---
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
   app.use(cors({ origin: env.clientUrl, credentials: true }));
   app.use(express.json());
   app.use(cookieParser());

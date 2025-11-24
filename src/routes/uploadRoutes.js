@@ -5,32 +5,36 @@ import * as uploadController from "../controllers/uploadController.js";
 
 const router = Router();
 
-// protect uploads with auth middleware
-router.use(authMiddleware);
-
-// image upload (max 5MB) - allow jpg/png/webp
+// --- 1. CẤU HÌNH UPLOAD ---
+// Image (Avatar/Photo) - Max 5MB
 const imageUpload = createUploadMiddleware({
   subfolder: "images",
   allowedMime: ["image/jpeg", "image/png", "image/webp"],
   maxSize: 5 * 1024 * 1024,
 });
 
-router.post("/image", imageUpload.single("file"), uploadController.uploadFile);
-
-// generic file upload (max 20MB), allow common types:
+// File & Audio
 const fileUpload = createUploadMiddleware({
   subfolder: "files",
-  allowedMime: [], // empty means allow any
+  allowedMime: [],
   maxSize: 20 * 1024 * 1024,
 });
-router.post("/file", fileUpload.single("file"), uploadController.uploadFile);
 
-// audio upload (voice message) - allow webm/ogg/mp3 up to 2MB by default
 const audioUpload = createUploadMiddleware({
   subfolder: "audio",
   allowedMime: ["audio/webm", "audio/ogg", "audio/mpeg", "audio/wav"],
   maxSize: 5 * 1024 * 1024,
 });
+
+// --- 2. ROUTE PUBLIC (Không cần Token) ---
+// Cho phép upload ảnh lúc đăng ký
+router.post("/image", imageUpload.single("file"), uploadController.uploadFile);
+
+// --- 3. ROUTE PRIVATE (Cần Token) ---
+// Các loại file khác hoặc audio chat thì bắt buộc phải đăng nhập
+router.use(authMiddleware);
+
+router.post("/file", fileUpload.single("file"), uploadController.uploadFile);
 router.post("/audio", audioUpload.single("file"), uploadController.uploadAudio);
 
 export default router;
