@@ -7,11 +7,20 @@ export const sendMessage = async (payload) => {
   const { conversationId, senderId, type, text, fileUrl, metadata, replyToId } = payload;
 
   const conv = await Conversation.findById(conversationId);
+
+  if (conv.isDisbanded) {
+    throw new Error("Nhóm đã bị giải tán, không thể gửi tin nhắn.");
+  }
+
   if (!conv) throw new Error("Conversation not found");
 
   // check membership for private/group
   const member = conv.members.find((m) => m.userId.toString() === senderId.toString());
   if (!member) throw new Error("Not a member of conversation");
+
+  if (member.leftAt) {
+    throw new Error("Bạn không còn là thành viên của nhóm này, không thể gửi tin nhắn.");
+  }
 
   if (conv.type === "private") {
     // Tìm người nhận (người kia trong hội thoại)
@@ -79,15 +88,27 @@ export const sendMessage = async (payload) => {
 };
 
 export const getMessages = async ({ conversationId, currentUserId, limit = 20, cursor = null }) => {
+  // 1. Lấy thông tin hội thoại để biết deletedAt của user
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw new Error("Conversation not found");
+
+  const member = conv.members.find((m) => m.userId.toString() === currentUserId.toString());
+  if (!member) throw new Error("Not authorized");
+
+  const deletedAt = member.deletedAt || new Date(0);
+
+  const maxDate = member.leftAt ? new Date(member.leftAt) : new Date();
+
   const query = {
     conversationId: new mongoose.Types.ObjectId(conversationId),
     deletedBy: { $ne: new mongoose.Types.ObjectId(currentUserId) },
+    createdAt: { $gt: deletedAt, $lte: maxDate }, // --- THÊM ĐIỀU KIỆN NÀY ---
   };
 
   if (cursor) {
     const cursorMsg = await Message.findById(cursor).select("createdAt");
     if (cursorMsg) {
-      query.createdAt = { $lt: cursorMsg.createdAt };
+      query.createdAt = { ...query.createdAt, $lt: cursorMsg.createdAt };
     }
   }
 
@@ -99,10 +120,7 @@ export const getMessages = async ({ conversationId, currentUserId, limit = 20, c
     .populate({
       path: "replyTo",
       select: "text fileUrl type isRecalled sender",
-      populate: {
-        path: "sender",
-        select: "_id displayName",
-      },
+      populate: { path: "sender", select: "_id displayName" },
     });
 
   return msgs;

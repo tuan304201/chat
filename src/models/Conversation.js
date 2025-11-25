@@ -5,6 +5,8 @@ const memberSchema = new mongoose.Schema({
   role: { type: String, enum: ["member", "admin"], default: "member" },
   lastViewedAt: { type: Date, default: Date.now },
   hasUnseenReaction: { type: Boolean, default: false },
+  deletedAt: { type: Date, default: null },
+  leftAt: { type: Date, default: null },
 });
 
 const conversationSchema = new mongoose.Schema(
@@ -14,11 +16,11 @@ const conversationSchema = new mongoose.Schema(
     title: { type: String, default: null },
     avatar: { type: String, default: null },
     inviteCode: { type: String, default: null, index: true },
-
+    ownerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     lastMessage: { type: mongoose.Schema.Types.ObjectId, ref: "Message", default: null },
-
+    isDisbanded: { type: Boolean, default: false },
     lastAction: {
-      type: { type: String, enum: ["message", "reaction", "recall"], default: "message" },
+      type: { type: String, enum: ["message", "reaction", "recall", "system"], default: "message" },
       text: String,
       sender: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
       createdAt: { type: Date, default: Date.now },

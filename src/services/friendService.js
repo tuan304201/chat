@@ -21,13 +21,18 @@ export const sendRequest = async ({ fromId, toId }) => {
     // duplicate key or other
     if (err.code === 11000) {
       const existing = await FriendRequest.findOne({ from: fromId, to: toId });
+
       if (existing.status === "pending") throw new Error("Friend request already sent");
-      if (existing.status === "declined") {
-        // we may allow re-sending by updating status
+
+      // --- SỬA ĐOẠN NÀY ---
+      // Nếu status là 'declined' (bị từ chối) HOẶC 'accepted' (đã từng kết bạn nhưng đã hủy)
+      // Thì cho phép gửi lại bằng cách reset về 'pending'
+      if (existing.status === "declined" || existing.status === "accepted") {
         existing.status = "pending";
         await existing.save();
         return existing;
       }
+      // --------------------
     }
     throw err;
   }
@@ -72,8 +77,12 @@ export const cancelRequest = async ({ requestId, senderId }) => {
   const req = await FriendRequest.findById(requestId);
   if (!req) throw new Error("Friend request not found");
   if (req.from.toString() !== senderId.toString()) throw new Error("Not authorized");
+
+  const deletedRequest = req.toObject();
+
   await req.deleteOne();
-  return true;
+
+  return deletedRequest;
 };
 
 export const listRequests = async (userId) => {

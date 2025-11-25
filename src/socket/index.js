@@ -41,36 +41,49 @@ export default function initSocketServer(httpServer) {
 
   io.on("connection", async (socket) => {
     const { id: socketId } = socket;
-    const userId = socket.user.id;
+    const userId = socket.user.id; // userId từ middleware
 
-    // store socket id in redis set for this user
+    // Lưu socket id
     await redis.sadd(`user_sockets:${userId}`, socketId);
-    // mark online flag
+    // Đánh dấu online
     await redis.set(`user_online:${userId}`, "1");
-    // publish online event to all servers via adapter (use io.emit keeps in cluster)
+
+    // Emit online cho mọi người
     io.emit("user:online", { userId });
 
-    // attach a simple rate limiter per socket
     socket.use(rateLimitMiddleware);
 
-    // Create rooms for user's personal channel (for direct push, e.g., presence)
     const personalRoom = `user:${userId}`;
     socket.join(personalRoom);
 
-    // register handlers
     chatHandler(io, socket);
     groupHandler(io, socket);
     presenceHandler(io, socket);
 
     socket.on("disconnect", async (reason) => {
-      // remove socket id
+      console.log(`User disconnected: ${userId} (Socket: ${socketId}) - Reason: ${reason}`);
+
+      // 1. Xóa socket id hiện tại khỏi set
       await redis.srem(`user_sockets:${userId}`, socketId);
 
+      // 2. Kiểm tra xem còn socket nào khác không
       const remaining = await redis.scard(`user_sockets:${userId}`);
-      if (!remaining) {
+
+      // Debug log để kiểm tra
+      console.log(`Remaining sockets for user ${userId}: ${remaining}`);
+
+      // 3. Nếu không còn socket nào -> Offline thật sự
+      if (remaining <= 0) {
+        // Xóa cờ online
         await redis.del(`user_online:${userId}`);
-        await redis.set(`user_lastSeen:${userId}`, Date.now());
-        io.emit("user:offline", { userId });
+
+        // Cập nhật lastSeen
+        const lastSeen = Date.now();
+        await redis.set(`user_lastSeen:${userId}`, lastSeen);
+
+        // Broadcast sự kiện offline cho toàn bộ hệ thống
+        io.emit("user:offline", { userId, lastSeen });
+        console.log(`>>> User ${userId} is now OFFLINE`);
       }
     });
   });

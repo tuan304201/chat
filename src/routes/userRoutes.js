@@ -9,5 +9,6 @@ router.get("/me", userController.getProfile);
 router.get("/search", userController.search);
 router.put("/update", userController.updateProfile);
 router.get("/friends", userController.friends);
+router.get("/info/:id", userController.getUserInfo);
 
 export default router;

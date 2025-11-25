@@ -32,8 +32,8 @@ export const accept = async (req, res, next) => {
 
     const io = req.app.get("io");
 
-    // Notify người gửi request
-    io.to(`user:${result.from}`).emit("friend:request_accepted", {
+    // Notify người gửi request (Fix: ép kiểu toString để room chính xác)
+    io.to(`user:${result.from.toString()}`).emit("friend:request_accepted", {
       friendId: req.user.id,
       friend: req.user,
     });
@@ -59,7 +59,8 @@ export const decline = async (req, res, next) => {
     const io = req.app.get("io");
 
     // Notify người gửi yêu cầu: bị từ chối
-    io.to(`user:${result.from}`).emit("friend:request_declined", {
+    // FIX: Thêm .toString()
+    io.to(`user:${result.from.toString()}`).emit("friend:request_declined", {
       requestId: result._id,
       by: req.user.id,
     });
@@ -77,6 +78,7 @@ export const decline = async (req, res, next) => {
 
 export const cancel = async (req, res, next) => {
   try {
+    // result bây giờ là object request đã xóa (nhờ bước 1)
     const result = await friendService.cancelRequest({
       requestId: req.body.requestId,
       senderId: req.user.id,
@@ -85,10 +87,13 @@ export const cancel = async (req, res, next) => {
     const io = req.app.get("io");
 
     // Notify người nhận: yêu cầu đã bị hủy
-    io.to(`user:${result.to}`).emit("friend:request_canceled", {
-      requestId: result._id,
-      by: req.user.id,
-    });
+    // FIX: Thêm .toString() và đảm bảo result.to tồn tại
+    if (result.to) {
+      io.to(`user:${result.to.toString()}`).emit("friend:request_canceled", {
+        requestId: result._id,
+        by: req.user.id,
+      });
+    }
 
     // Notify người gửi
     io.to(`user:${req.user.id}`).emit("friend:you_canceled", {
@@ -124,7 +129,8 @@ export const unfriend = async (req, res, next) => {
       friendId: req.body.friendId,
     });
 
-    io.to(`user:${req.body.friendId}`).emit("friend:unfriended", {
+    // Fix: ép kiểu toString
+    io.to(`user:${req.body.friendId.toString()}`).emit("friend:unfriended", {
       friendId: req.user.id,
     });
 

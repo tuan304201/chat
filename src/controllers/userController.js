@@ -36,3 +36,12 @@ export const friends = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getUserInfo = async (req, res, next) => {
+  try {
+    const user = await userService.getUserDetails(req.params.id);
+    res.json({ success: true, user });
+  } catch (err) {
+    next(err);
+  }
+};

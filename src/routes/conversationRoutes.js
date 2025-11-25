@@ -7,12 +7,18 @@ router.use(authMiddleware);
 
 router.post("/private", conversationController.createPrivate);
 router.post("/group", conversationController.createGroup);
-router.post("/add-member", conversationController.addMember);
-router.post("/remove-member", conversationController.removeMember);
 
 router.get("/", conversationController.list);
 router.get("/:id", conversationController.detail);
 
 router.post("/join", conversationController.joinByInvite);
+router.delete("/:id", conversationController.deleteConversation);
+router.put("/:id", conversationController.updateGroup);
+
+router.post("/:id/leave", conversationController.leaveGroup);
+router.delete("/:id/disband", conversationController.disbandGroup);
+router.put("/:id/role", conversationController.updateRole);
+router.post("/:id/add", conversationController.addMembers);
+router.post("/:id/kick", conversationController.kickMember);
 
 export default router;

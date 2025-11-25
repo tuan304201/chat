@@ -8,6 +8,11 @@ export default function chatHandler(io, socket) {
   socket.on("conversation:join", async ({ conversationId }, cb) => {
     try {
       const conv = await convoService.getConversationById(conversationId, userId);
+      const amIMember = conv.members.find((m) => (m.userId._id || m.userId).toString() === userId);
+      if (!amIMember) {
+        if (cb) cb({ success: false, message: "Bạn không còn là thành viên" });
+        return;
+      }
       socket.join(`conv:${conversationId}`);
       if (cb) cb({ success: true, conversationId });
     } catch (err) {

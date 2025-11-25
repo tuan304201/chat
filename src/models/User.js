@@ -27,6 +27,17 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
+    birthDate: {
+      type: Date,
+      default: null,
+    },
+
+    gender: {
+      type: String,
+      enum: ["Nam", "Nữ", "Khác"],
+      default: "Khác",
+    },
+
     bio: {
       type: String,
       default: "",
