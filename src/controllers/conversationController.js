@@ -71,6 +71,31 @@ export const addMembers = async (req, res, next) => {
   }
 };
 
+export const pinConversation = async (req, res, next) => {
+  try {
+    const result = await convoService.togglePin({
+      conversationId: req.params.id,
+      userId: req.user.id,
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+
+export const muteConversation = async (req, res, next) => {
+  try {
+    const result = await convoService.muteConversation({
+      conversationId: req.params.id,
+      userId: req.user.id,
+      duration: req.body.duration, // phút
+    });
+    res.json({ success: true, ...result });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export const updateGroup = async (req, res, next) => {
   try {
     const conv = await convoService.updateGroupInfo({
@@ -83,10 +108,12 @@ export const updateGroup = async (req, res, next) => {
     // Notify qua socket (Realtime cập nhật tên/ảnh nhóm cho mọi người)
     const io = req.app.get("io");
     conv.members.forEach((m) => {
-      io.to(`user:${m.userId}`).emit("conversation:update", {
-        conversationId: conv._id,
-        conversation: conv, // Gửi full info mới để client update
-      });
+      if (!m.leftAt) {
+        io.to(`user:${m.userId}`).emit("conversation:update", {
+          conversationId: conv._id,
+          conversation: conv,
+        });
+      }
     });
 
     res.json({ success: true, conversation: conv });
@@ -277,33 +304,43 @@ export const kickMember = async (req, res, next) => {
     const conversationRoom = `conv:${req.params.id}`;
     const targetUserId = req.body.memberId;
 
-    // 1. Báo cho CẢ NHÓM (update UI)
-    io.to(conversationRoom).emit("group:update", {
+    // 1. Payload chung cho sự kiện update
+    const updatePayload = {
       conversationId: req.params.id,
-      message: result.message,
-      members: result.conversation.members,
-    });
+      message: result.message, // Tin nhắn hệ thống "A đã mời B ra khỏi nhóm"
+      members: result.conversation.members, // Danh sách thành viên mới (đã đánh dấu leftAt cho B)
+      // Gửi kèm lastMessage để Sidebar cập nhật hiển thị text
+      lastMessage: result.message,
+      updatedAt: new Date(),
+    };
 
-    // 2. Báo riêng cho người bị kích (update UI)
+    // 2. Báo cho CẢ NHÓM (bao gồm người bị kích nếu họ đang online trong room)
+    io.to(conversationRoom).emit("group:update", updatePayload);
+
+    // 3. Báo riêng cho người bị kích (User B) qua kênh User cá nhân
+    // Để đảm bảo dù họ đang ở đâu (đang lướt sidebar) cũng nhận được tin
     io.to(`user:${targetUserId}`).emit("group:update", {
-      conversationId: req.params.id,
-      message: result.message,
-      members: result.conversation.members,
-      // Cờ hiệu để frontend biết mình bị kick (option bổ sung)
-      isKicked: true,
+      ...updatePayload,
+      isKicked: true, // Cờ báo hiệu riêng
     });
 
-    // --- 3. LOGIC MỚI: CƯỠNG CHẾ RỜI ROOM SOCKET ---
-    // Lấy danh sách socketID của user bị kích từ Redis
+    // 4. Báo riêng cho Sidebar của những người còn lại (để dòng chat nhảy lên đầu)
+    // Lọc ra những người còn lại trong nhóm
+    result.conversation.members.forEach((m) => {
+      if (!m.leftAt && m.userId._id.toString() !== targetUserId) {
+        io.to(`user:${m.userId._id}`).emit("conversation:update", updatePayload);
+      }
+    });
+
+    // --- 5. CƯỠNG CHẾ NGẮT KẾT NỐI SOCKET ---
+    // Thực hiện sau khi đã bắn thông báo để client kịp nhận
     const socketIds = await redis.smembers(`user_sockets:${targetUserId}`);
     if (socketIds && socketIds.length > 0) {
-      // Yêu cầu tất cả socket của user này rời khỏi room chat ngay lập tức
-      // io.in(socketId).socketsLeave(room) hoạt động tốt với Socket.io v4
       socketIds.forEach((socketId) => {
         io.in(socketId).socketsLeave(conversationRoom);
       });
     }
-    // ----------------------------------------------
+    // ---------------------------------------
 
     res.json({ success: true, conversation: result.conversation });
   } catch (err) {

@@ -7,6 +7,8 @@ const memberSchema = new mongoose.Schema({
   hasUnseenReaction: { type: Boolean, default: false },
   deletedAt: { type: Date, default: null },
   leftAt: { type: Date, default: null },
+  isPinned: { type: Boolean, default: false },
+  muteUntil: { type: Date, default: null },
 });
 
 const conversationSchema = new mongoose.Schema(

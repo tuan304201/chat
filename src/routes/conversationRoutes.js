@@ -20,5 +20,6 @@ router.delete("/:id/disband", conversationController.disbandGroup);
 router.put("/:id/role", conversationController.updateRole);
 router.post("/:id/add", conversationController.addMembers);
 router.post("/:id/kick", conversationController.kickMember);
-
+router.post("/:id/pin", conversationController.pinConversation);
+router.post("/:id/mute", conversationController.muteConversation);
 export default router;

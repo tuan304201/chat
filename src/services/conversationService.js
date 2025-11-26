@@ -129,6 +129,11 @@ export const getConversationsForUser = async (userId, { limit = 30, skip = 0 } =
     const lastViewedAt = currentMember?.lastViewedAt || new Date(0);
     const hasUnseenReaction = currentMember?.hasUnseenReaction || false;
 
+    convObj.isPinned = currentMember.isPinned || false;
+    convObj.muteUntil = currentMember.muteUntil || null;
+
+    convObj.isMuted = convObj.muteUntil && new Date(convObj.muteUntil) > new Date();
+
     // 3. Logic hiển thị Preview (Ưu tiên lastAction nếu nó mới hơn tin nhắn)
     let previewDisplay = convObj.lastMessage;
 
@@ -159,9 +164,54 @@ export const getConversationsForUser = async (userId, { limit = 30, skip = 0 } =
     results.push(convObj);
   }
 
+  results.sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    // Nếu cùng trạng thái pin thì giữ nguyên thứ tự (do DB đã sort time)
+    return 0;
+  });
   // 5. Cắt trang thủ công (Pagination)
   // Vì ta đã lọc bớt hội thoại đã xóa, nên phải slice ở bước
   return results.slice(skip, skip + limit);
+};
+
+export const togglePin = async ({ conversationId, userId }) => {
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw new Error("Not found");
+
+  const member = conv.members.find((m) => m.userId.toString() === userId.toString());
+  if (!member) throw new Error("Not authorized");
+
+  member.isPinned = !member.isPinned;
+  await conv.save();
+
+  return { conversationId, isPinned: member.isPinned };
+};
+
+export const muteConversation = async ({ conversationId, userId, duration }) => {
+  // duration: số phút (number). Ví dụ: 15, 60, 480.
+  // Nếu -1 là "Đến khi tôi mở lại" (Set năm 2099)
+  // Nếu 0 là "Bật lại thông báo"
+
+  const conv = await Conversation.findById(conversationId);
+  if (!conv) throw new Error("Not found");
+
+  const member = conv.members.find((m) => m.userId.toString() === userId.toString());
+  if (!member) throw new Error("Not authorized");
+
+  let muteDate = null;
+  if (duration === 0) {
+    muteDate = null; // Unmute
+  } else if (duration === -1) {
+    muteDate = new Date("2099-12-31"); // Forever until toggle
+  } else {
+    muteDate = new Date(Date.now() + duration * 60000); // Current + minutes
+  }
+
+  member.muteUntil = muteDate;
+  await conv.save();
+
+  return { conversationId, muteUntil: member.muteUntil, isMuted: !!muteDate };
 };
 
 export const deleteConversationForUser = async (conversationId, userId) => {

@@ -49,13 +49,15 @@ export default function chatHandler(io, socket) {
       const conv = await Conversation.findById(payload.conversationId);
       if (conv) {
         conv.members.forEach((member) => {
-          // Gửi sự kiện vào room cá nhân của từng user ("user:ID")
-          // Frontend sẽ lắng nghe event này để update danh sách chat và push tin nhắn
-          io.to(`user:${member.userId}`).emit("conversation:update", {
-            conversationId: conv._id,
-            lastMessage: msg,
-            updatedAt: conv.updatedAt,
-          });
+          // --- THÊM ĐIỀU KIỆN NÀY: Chỉ gửi nếu chưa rời nhóm ---
+          if (!member.leftAt) {
+            io.to(`user:${member.userId}`).emit("conversation:update", {
+              conversationId: conv._id,
+              lastMessage: msg,
+              updatedAt: conv.updatedAt,
+            });
+          }
+          // ---------------------------------------------------
         });
       }
 
